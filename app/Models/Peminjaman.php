@@ -21,10 +21,16 @@ class Peminjaman extends Model
     // Relasi ke User
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
-    // Relasi ke DetailPinjam
+    // Relasi utama ke DetailPinjam
+    public function detailpinjam()
+    {
+        return $this->hasMany(DetailPinjam::class, 'peminjaman_id');
+    }
+
+    // Alias relasi lama
     public function detailpinjams()
     {
         return $this->hasMany(DetailPinjam::class, 'peminjaman_id');

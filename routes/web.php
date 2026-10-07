@@ -1,17 +1,20 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\PetugasController;
 use App\Http\Controllers\PeminjamController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\WEB\PengembalianController;
 
+
 /*
 |--------------------------------------------------------------------------
-| Halaman Utama
+| HALAMAN UTAMA
 |--------------------------------------------------------------------------
 */
+
 Route::get('/', function () {
     return view('welcome');
 });
@@ -22,21 +25,28 @@ Route::get('/', function () {
 | ADMIN
 |--------------------------------------------------------------------------
 */
+
 Route::middleware(['auth', 'role.admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
 
-        // Dashboard Admin
-        Route::get('/dashboard', [AdminController::class, 'index'])
+        /*
+        |--------------------------------------------------------------------------
+        | DASHBOARD
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/dashboard', [AdminController::class, 'dashboard'])
             ->name('dashboard');
 
 
         /*
         |--------------------------------------------------------------------------
-        | PROFIL ADMIN
+        | PROFILE ADMIN
         |--------------------------------------------------------------------------
         */
+
         Route::get('/profile', [AdminController::class, 'profile'])
             ->name('profile');
 
@@ -49,9 +59,10 @@ Route::middleware(['auth', 'role.admin'])
 
         /*
         |--------------------------------------------------------------------------
-        | CRUD USER
+        | USER
         |--------------------------------------------------------------------------
         */
+
         Route::get('/users', [AdminController::class, 'indexUser'])
             ->name('user.index');
 
@@ -73,9 +84,10 @@ Route::middleware(['auth', 'role.admin'])
 
         /*
         |--------------------------------------------------------------------------
-        | CRUD KATEGORI
+        | KATEGORI
         |--------------------------------------------------------------------------
         */
+
         Route::get('/kategori', [AdminController::class, 'indexKategori'])
             ->name('kategori.index');
 
@@ -97,9 +109,10 @@ Route::middleware(['auth', 'role.admin'])
 
         /*
         |--------------------------------------------------------------------------
-        | CRUD ALAT
+        | ALAT
         |--------------------------------------------------------------------------
         */
+
         Route::get('/alat', [AdminController::class, 'indexAlat'])
             ->name('alat.index');
 
@@ -121,48 +134,58 @@ Route::middleware(['auth', 'role.admin'])
 
         /*
         |--------------------------------------------------------------------------
-        | CRUD PEMINJAMAN
+        | PEMINJAMAN
         |--------------------------------------------------------------------------
         */
+
+        // Menampilkan daftar peminjaman
         Route::get('/peminjaman', [AdminController::class, 'indexPeminjaman'])
             ->name('peminjaman.index');
 
+        // Form tambah peminjaman
         Route::get('/peminjaman/create', [AdminController::class, 'createPeminjaman'])
             ->name('peminjaman.create');
 
+        // Menyimpan peminjaman baru
         Route::post('/peminjaman', [AdminController::class, 'storePeminjaman'])
             ->name('peminjaman.store');
 
-        Route::put('/peminjaman/{id}', [AdminController::class, 'updatePeminjaman'])
-            ->name('peminjaman.update');
-
+        // Mengubah status peminjaman
         Route::put('/peminjaman/{id}/status', [AdminController::class, 'updateStatusPeminjaman'])
             ->name('peminjaman.updateStatus');
 
+        // Menghapus peminjaman
         Route::delete('/peminjaman/{id}', [AdminController::class, 'destroyPeminjaman'])
             ->name('peminjaman.destroy');
 
 
         /*
         |--------------------------------------------------------------------------
-        | PENGEMBALIAN ADMIN
+        | PENGEMBALIAN
         |--------------------------------------------------------------------------
         */
+
+        // Daftar pengembalian
         Route::get('/pengembalian', [PengembalianController::class, 'index'])
             ->name('pengembalian.index');
 
+        // Form pengembalian
         Route::get('/pengembalian/create/{peminjaman_id}', [PengembalianController::class, 'create'])
             ->name('pengembalian.create');
 
+        // Simpan pengembalian
         Route::post('/pengembalian', [PengembalianController::class, 'store'])
             ->name('pengembalian.store');
 
+        // Form edit pengembalian
         Route::get('/pengembalian/{id}/edit', [PengembalianController::class, 'edit'])
             ->name('pengembalian.edit');
 
+        // Update pengembalian
         Route::put('/pengembalian/{id}', [PengembalianController::class, 'update'])
             ->name('pengembalian.update');
 
+        // Hapus pengembalian
         Route::delete('/pengembalian/{id}', [PengembalianController::class, 'destroy'])
             ->name('pengembalian.destroy');
 
@@ -172,9 +195,11 @@ Route::middleware(['auth', 'role.admin'])
         | LOG AKTIVITAS
         |--------------------------------------------------------------------------
         */
+
         Route::get('/log-aktivitas', [AdminController::class, 'indexLogAktivitas'])
             ->name('logaktivitas.index');
     });
+
 
 
 /*
@@ -182,6 +207,7 @@ Route::middleware(['auth', 'role.admin'])
 | PETUGAS
 |--------------------------------------------------------------------------
 */
+
 Route::middleware(['auth', 'role.petugas'])
     ->prefix('petugas')
     ->name('petugas.')
@@ -189,9 +215,10 @@ Route::middleware(['auth', 'role.petugas'])
 
         /*
         |--------------------------------------------------------------------------
-        | PROFIL PETUGAS
+        | PROFILE PETUGAS
         |--------------------------------------------------------------------------
         */
+
         Route::get('/profile', [PetugasController::class, 'profile'])
             ->name('profile');
 
@@ -204,9 +231,10 @@ Route::middleware(['auth', 'role.petugas'])
 
         /*
         |--------------------------------------------------------------------------
-        | PERSETUJUAN PEMINJAMAN
+        | PEMINJAMAN PETUGAS
         |--------------------------------------------------------------------------
         */
+
         Route::get('/peminjaman', [PetugasController::class, 'indexPeminjaman'])
             ->name('peminjaman.index');
 
@@ -219,9 +247,10 @@ Route::middleware(['auth', 'role.petugas'])
 
         /*
         |--------------------------------------------------------------------------
-        | PENGEMBALIAN
+        | PENGEMBALIAN PETUGAS
         |--------------------------------------------------------------------------
         */
+
         Route::get('/pengembalian', [PetugasController::class, 'indexPengembalian'])
             ->name('pengembalian.index');
 
@@ -234,6 +263,7 @@ Route::middleware(['auth', 'role.petugas'])
         | LAPORAN PETUGAS
         |--------------------------------------------------------------------------
         */
+
         Route::get('/laporan', [PetugasController::class, 'laporan'])
             ->name('laporan.index');
 
@@ -242,11 +272,13 @@ Route::middleware(['auth', 'role.petugas'])
     });
 
 
+
 /*
 |--------------------------------------------------------------------------
 | PEMINJAM
 |--------------------------------------------------------------------------
 */
+
 Route::middleware(['auth', 'role.peminjam'])
     ->prefix('peminjam')
     ->name('peminjam.')
@@ -254,9 +286,10 @@ Route::middleware(['auth', 'role.peminjam'])
 
         /*
         |--------------------------------------------------------------------------
-        | PROFIL PEMINJAM
+        | PROFILE PEMINJAM
         |--------------------------------------------------------------------------
         */
+
         Route::get('/profile', [PeminjamController::class, 'profile'])
             ->name('profile');
 
@@ -272,15 +305,17 @@ Route::middleware(['auth', 'role.peminjam'])
         | KATALOG ALAT
         |--------------------------------------------------------------------------
         */
+
         Route::get('/katalog', [PeminjamController::class, 'katalogAlat'])
             ->name('katalog');
 
 
         /*
         |--------------------------------------------------------------------------
-        | AJUKAN PEMINJAMAN
+        | PENGAJUAN PEMINJAMAN
         |--------------------------------------------------------------------------
         */
+
         Route::post('/peminjaman/ajukan', [PeminjamController::class, 'ajukanPeminjaman'])
             ->name('ajukan');
 
@@ -290,21 +325,26 @@ Route::middleware(['auth', 'role.peminjam'])
         | RIWAYAT PEMINJAMAN
         |--------------------------------------------------------------------------
         */
+
         Route::get('/riwayat', [PeminjamController::class, 'riwayatPeminjaman'])
             ->name('riwayat');
     });
 
 
+
 /*
 |--------------------------------------------------------------------------
-| AUTH & LOGIN
+| AUTHENTICATION
 |--------------------------------------------------------------------------
 */
+
 Route::middleware('guest')->group(function () {
 
+    // Halaman login
     Route::get('/login', [AuthController::class, 'showLoginForm'])
         ->name('login');
 
+    // Proses login
     Route::post('/login', [AuthController::class, 'login']);
 });
 
@@ -314,6 +354,7 @@ Route::middleware('guest')->group(function () {
 | LOGOUT
 |--------------------------------------------------------------------------
 */
+
 Route::post('/logout', [AuthController::class, 'logout'])
     ->name('logout')
     ->middleware('auth');

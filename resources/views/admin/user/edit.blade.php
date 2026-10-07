@@ -1,156 +1,189 @@
 @extends('layouts.app')
 
 @section('title', 'Edit User - Panel Admin')
-@section('header-title', 'Edit Data Pengguna')
+@section('header-title', 'Manajemen Pengguna Sistem')
 
 @section('content')
 
-<div class="max-w-xl bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+<div class="max-w-xl bg-white rounded-lg shadow-sm border border-gray-200 p-4">
 
-```
-<form action="{{ route('admin.user.update', $user->id) }}"
-      method="POST"
-      enctype="multipart/form-data">
+    <form action="{{ route('admin.user.update', $user->id) }}"
+          method="POST"
+          enctype="multipart/form-data">
 
-    @csrf
-    @method('PUT')
+        @csrf
+        @method('PUT')
 
-    <div class="mb-4">
-        <label class="block text-gray-700 text-sm font-semibold mb-2">
-            Nama Lengkap
-        </label>
+        {{-- NAMA LENGKAP --}}
+        <div class="mb-4">
+            <label for="name" class="block text-xs font-medium text-gray-700 mb-2">
+                Nama Lengkap
+            </label>
 
-        <input type="text"
-               name="name"
-               value="{{ old('name', $user->name) }}"
-               required
-               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input
+                type="text"
+                name="name"
+                id="name"
+                value="{{ old('name', $user->name) }}"
+                class="w-full border border-gray-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                required
+            >
 
-        @error('name')
-            <span class="text-red-500 text-xs">{{ $message }}</span>
-        @enderror
-    </div>
+            @error('name')
+                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+            @enderror
+        </div>
 
-    <div class="mb-4">
-        <label class="block text-gray-700 text-sm font-semibold mb-2">
-            Email
-        </label>
+        {{-- EMAIL --}}
+        <div class="mb-4">
+            <label for="email" class="block text-xs font-medium text-gray-700 mb-2">
+                Email
+            </label>
 
-        <input type="email"
-               name="email"
-               value="{{ old('email', $user->email) }}"
-               required
-               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input
+                type="email"
+                name="email"
+                id="email"
+                value="{{ old('email', $user->email) }}"
+                class="w-full border border-gray-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                required
+            >
 
-        @error('email')
-            <span class="text-red-500 text-xs">{{ $message }}</span>
-        @enderror
-    </div>
+            @error('email')
+                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+            @enderror
+        </div>
 
-    <div class="mb-4">
-        <label class="block text-gray-700 text-sm font-semibold mb-2">
-            Password Baru
-            <span class="text-xs text-gray-400 font-normal">
-                (Kosongkan jika tidak ingin mengubah password)
-            </span>
-        </label>
+        {{-- PASSWORD BARU --}}
+        <div class="mb-4">
+            <label for="password" class="block text-xs font-medium text-gray-700 mb-2">
+                Password Baru
+                <span class="text-gray-400 font-normal">
+                    (Kosongkan jika tidak ingin mengubah password)
+                </span>
+            </label>
 
-        <input type="password"
-               name="password"
-               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input
+                type="password"
+                name="password"
+                id="password"
+                class="w-full border border-gray-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
 
-        @error('password')
-            <span class="text-red-500 text-xs">{{ $message }}</span>
-        @enderror
-    </div>
+            @error('password')
+                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+            @enderror
+        </div>
 
-    {{-- FOTO PROFIL --}}
-    <div class="mb-4">
-        <label class="block text-gray-700 text-sm font-semibold mb-2">
-            Foto Profil
-        </label>
+        {{-- FOTO PROFIL --}}
+        <div class="mb-4">
+            <label for="foto_profile" class="block text-xs font-medium text-gray-700 mb-2">
+                Foto Profil
+            </label>
 
-        {{-- Foto lama --}}
-        @if($user->foto_profile)
-            <div class="mb-3">
-                <img src="{{ asset($user->foto_profile) }}"
-                     alt="Foto {{ $user->name }}"
-                     class="w-20 h-20 rounded-full object-cover border border-gray-300">
-            </div>
-        @endif
+            @if($user->foto_profile)
+                <div class="mb-2">
+                    <img
+                        src="{{ asset($user->foto_profile) }}"
+                        alt="Foto Profil"
+                        class="w-16 h-16 object-cover rounded-full border border-gray-300"
+                    >
+                </div>
+            @else
+                <div class="w-16 h-16 mb-2 rounded-full border border-gray-300 flex items-center justify-center text-[9px] text-gray-400">
+                    Belum ada foto
+                </div>
+            @endif
 
-        <input type="file"
-               name="foto_profile"
-               accept="image/jpeg,image/png,image/jpg"
-               class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input
+                type="file"
+                name="foto_profile"
+                id="foto_profile"
+                accept="image/jpeg,image/png,image/jpg"
+                class="w-full border border-gray-300 rounded-md px-2 py-2 text-sm"
+            >
 
-        <p class="text-xs text-gray-500 mt-1">
-            Pilih foto baru jika ingin mengganti foto profil. Format JPG, JPEG, PNG. Maksimal 2 MB.
-        </p>
+            <p class="text-gray-500 text-[9px] mt-1">
+                Pilih foto baru jika ingin mengganti foto profil. Format JPG, JPEG, PNG. Maksimal 2 MB.
+            </p>
 
-        @error('foto_profile')
-            <span class="text-red-500 text-xs">{{ $message }}</span>
-        @enderror
-    </div>
+            @error('foto_profile')
+                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+            @enderror
+        </div>
 
-    <div class="mb-4">
-        <label class="block text-gray-700 text-sm font-semibold mb-2">
-            Role / Hak Akses
-        </label>
+        {{-- ROLE / HAK AKSES --}}
+        <div class="mb-4">
+            <label for="role" class="block text-xs font-medium text-gray-700 mb-2">
+                Role / Hak Akses
+            </label>
 
-        <select name="role"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select
+                name="role"
+                id="role"
+                class="w-full border border-gray-300 rounded-md px-2 py-2 text-sm bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                required
+            >
+                <option value="admin"
+                    {{ old('role', $user->role) == 'admin' ? 'selected' : '' }}>
+                    Admin
+                </option>
 
-            <option value="peminjam" {{ $user->role == 'peminjam' ? 'selected' : '' }}>
-                Peminjam
-            </option>
+                <option value="petugas"
+                    {{ old('role', $user->role) == 'petugas' ? 'selected' : '' }}>
+                    Petugas
+                </option>
 
-            <option value="petugas" {{ $user->role == 'petugas' ? 'selected' : '' }}>
-                Petugas
-            </option>
+                <option value="peminjam"
+                    {{ old('role', $user->role) == 'peminjam' ? 'selected' : '' }}>
+                    Peminjam
+                </option>
+            </select>
 
-            <option value="admin" {{ $user->role == 'admin' ? 'selected' : '' }}>
-                Admin
-            </option>
+            @error('role')
+                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+            @enderror
+        </div>
 
-        </select>
+        {{-- NO. HP --}}
+        <div class="mb-4">
+            <label for="no_hp" class="block text-xs font-medium text-gray-700 mb-2">
+                No. HP
+            </label>
 
-        @error('role')
-            <span class="text-red-500 text-xs">{{ $message }}</span>
-        @enderror
-    </div>
+            <input
+                type="text"
+                name="no_hp"
+                id="no_hp"
+                value="{{ old('no_hp', $user->no_hp) }}"
+                class="w-full border border-gray-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
 
-    <div class="mb-6">
-        <label class="block text-gray-700 text-sm font-semibold mb-2">
-            No. HP
-        </label>
+            @error('no_hp')
+                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+            @enderror
+        </div>
 
-        <input type="text"
-               name="no_hp"
-               value="{{ old('no_hp', $user->no_hp) }}"
-               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        {{-- TOMBOL --}}
+        <div class="flex justify-end gap-2 mt-5">
 
-        @error('no_hp')
-            <span class="text-red-500 text-xs">{{ $message }}</span>
-        @enderror
-    </div>
+            <a
+                href="{{ route('admin.user.index') }}"
+                class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md text-sm"
+            >
+                Batal
+            </a>
 
-    <div class="flex justify-end space-x-2">
+            <button
+                type="submit"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm"
+            >
+                Perbarui
+            </button>
 
-        <a href="{{ route('admin.user.index') }}"
-           class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg text-sm font-semibold transition">
-            Batal
-        </a>
+        </div>
 
-        <button type="submit"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
-            Perbarui
-        </button>
-
-    </div>
-
-</form>
-```
+    </form>
 
 </div>
 

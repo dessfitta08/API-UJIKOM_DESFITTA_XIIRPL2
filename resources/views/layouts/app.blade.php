@@ -6,18 +6,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-```
-<title>Panel Petugas / Admin</title>
+    <title>Panel Petugas / Admin</title>
 
-<!-- Tailwind CSS CDN -->
-<script src="https://cdn.tailwindcss.com"></script>
-```
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
 </head>
 
 <body class="bg-gray-100 font-sans antialiased">
 
-```
 <div class="flex h-screen bg-gray-100">
 
     <!-- ====================================================== -->
@@ -136,7 +133,7 @@
                             ? 'bg-gray-800 text-white'
                             : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}"
                     >
-                        Log Aktivitas
+                        Kelola Aktivitas
                     </a>
 
                 </nav>
@@ -344,12 +341,6 @@
 
             @elseif(auth()->user()->role === 'peminjam')
 
-                <!--
-                    PERBAIKAN:
-                    Sebelumnya menggunakan <div>, sehingga tidak bisa diklik.
-                    Sekarang menggunakan <a> menuju route peminjam.profile.
-                -->
-
                 <a
                     href="{{ route('peminjam.profile') }}"
                     class="block p-4 border-t border-gray-800 bg-gray-900 hover:bg-gray-800 transition cursor-pointer"
@@ -357,7 +348,6 @@
 
                     <div class="flex items-center space-x-3">
 
-                        <!-- FOTO -->
                         @if(auth()->user()->foto_profile)
 
                             <img
@@ -377,7 +367,6 @@
                         @endif
 
 
-                        <!-- DATA USER -->
                         <div class="overflow-hidden">
 
                             <span class="block text-xs text-gray-400">
@@ -529,7 +518,296 @@
     </div>
 
 </div>
-```
+
+
+<!-- ====================================================== -->
+<!-- MODAL KONFIRMASI PENGHAPUSAN GLOBAL -->
+<!-- ====================================================== -->
+
+<div
+    id="deleteModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 px-4"
+>
+
+    <div
+        class="w-full max-w-md bg-white rounded-lg shadow-xl border border-gray-200"
+        onclick="event.stopPropagation()"
+    >
+
+        <!-- HEADER MODAL -->
+        <div class="px-6 py-4 border-b border-gray-200">
+
+            <h2 class="text-lg font-semibold text-gray-800">
+                Konfirmasi Penghapusan
+            </h2>
+
+        </div>
+
+
+        <!-- ISI MODAL -->
+        <div class="px-6 py-5">
+
+            <p
+                id="deleteModalMessage"
+                class="text-sm text-gray-600 leading-relaxed"
+            >
+                Apakah yakin ingin menghapus data ini?
+            </p>
+
+        </div>
+
+
+        <!-- TOMBOL MODAL -->
+        <div class="px-6 pb-5">
+
+            <div class="flex items-center justify-between gap-3">
+
+                <!-- TOMBOL BATAL / BELUM DIKEMBALIKAN -->
+                <button
+                    type="button"
+                    id="deleteCancelButton"
+                    class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition"
+                >
+                    Batal
+                </button>
+
+
+                <!-- TOMBOL HAPUS -->
+                <button
+                    type="button"
+                    id="deleteConfirmButton"
+                    class="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition"
+                >
+                    Yakin Hapus
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- ====================================================== -->
+<!-- SCRIPT MODAL HAPUS -->
+<!-- ====================================================== -->
+
+<script>
+
+    document.addEventListener('DOMContentLoaded', function () {
+
+        const deleteModal =
+            document.getElementById('deleteModal');
+
+        const deleteMessage =
+            document.getElementById('deleteModalMessage');
+
+        const deleteCancelButton =
+            document.getElementById('deleteCancelButton');
+
+        const deleteConfirmButton =
+            document.getElementById('deleteConfirmButton');
+
+        let activeDeleteForm = null;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MEMBUKA MODAL
+        |--------------------------------------------------------------------------
+        */
+
+        document.addEventListener('click', function (event) {
+
+            const deleteButton =
+                event.target.closest('.delete-button');
+
+            if (!deleteButton) {
+                return;
+            }
+
+            const form =
+                deleteButton.closest('.delete-form');
+
+            if (!form) {
+                return;
+            }
+
+            activeDeleteForm = form;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | PESAN MODAL
+            |--------------------------------------------------------------------------
+            */
+
+            const message =
+                form.dataset.deleteMessage ||
+                'Apakah yakin ingin menghapus data ini?';
+
+            deleteMessage.textContent = message;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | JENIS DATA
+            |--------------------------------------------------------------------------
+            */
+
+            const deleteType =
+                form.dataset.deleteType || 'default';
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | KHUSUS PEMINJAMAN
+            |--------------------------------------------------------------------------
+            */
+
+            if (deleteType === 'peminjaman') {
+
+                deleteCancelButton.textContent =
+                    'Belum Dikembalikan';
+
+                deleteCancelButton.classList.remove(
+                    'bg-gray-500',
+                    'hover:bg-gray-600'
+                );
+
+                deleteCancelButton.classList.add(
+                    'bg-emerald-500',
+                    'hover:bg-emerald-600'
+                );
+
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | DATA LAIN
+            |--------------------------------------------------------------------------
+            */
+
+            else {
+
+                deleteCancelButton.textContent =
+                    'Batal';
+
+                deleteCancelButton.classList.remove(
+                    'bg-emerald-500',
+                    'hover:bg-emerald-600'
+                );
+
+                deleteCancelButton.classList.add(
+                    'bg-emerald-500',
+                    'hover:bg-emerald-600'
+                );
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | TAMPILKAN MODAL
+            |--------------------------------------------------------------------------
+            */
+
+            deleteModal.classList.remove('hidden');
+
+            deleteModal.classList.add('flex');
+
+        });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOMBOL BATAL / BELUM DIKEMBALIKAN
+        |--------------------------------------------------------------------------
+        */
+
+        deleteCancelButton.addEventListener('click', function () {
+
+            closeDeleteModal();
+
+        });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOMBOL YAKIN HAPUS
+        |--------------------------------------------------------------------------
+        */
+
+        deleteConfirmButton.addEventListener('click', function () {
+
+            if (activeDeleteForm) {
+
+                activeDeleteForm.submit();
+
+            }
+
+        });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | KLIK AREA GELAP DI LUAR MODAL
+        |--------------------------------------------------------------------------
+        */
+
+        deleteModal.addEventListener('click', function (event) {
+
+            if (event.target === deleteModal) {
+
+                closeDeleteModal();
+
+            }
+
+        });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOMBOL ESC
+        |--------------------------------------------------------------------------
+        */
+
+        document.addEventListener('keydown', function (event) {
+
+            if (
+                event.key === 'Escape' &&
+                !deleteModal.classList.contains('hidden')
+            ) {
+
+                closeDeleteModal();
+
+            }
+
+        });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FUNGSI MENUTUP MODAL
+        |--------------------------------------------------------------------------
+        */
+
+        function closeDeleteModal() {
+
+            deleteModal.classList.add('hidden');
+
+            deleteModal.classList.remove('flex');
+
+            activeDeleteForm = null;
+
+        }
+
+    });
+
+</script>
+
 
 </body>
 

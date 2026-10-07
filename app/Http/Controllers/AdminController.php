@@ -2,92 +2,87 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Alat;
 use App\Models\Kategori;
 use App\Models\User;
 use App\Models\LogAktivitas;
 use App\Models\Peminjaman;
 use App\Models\DetailPinjam;
+use App\Models\Pengembalian;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\File;
 
 class AdminController extends Controller
 {
-    // =========================================================
-    // DASHBOARD ADMIN
-    // =========================================================
+    /*
+    |--------------------------------------------------------------------------
+    | DASHBOARD
+    |--------------------------------------------------------------------------
+    */
 
-    // Menampilkan Dashboard Admin & Log Aktivitas
-    public function index()
-    {
-        $logs = LogAktivitas::with('user')
-            ->latest()
-            ->take(10)
-            ->get();
+    public function dashboard()
+{
+    // Total data untuk kartu dashboard
+    $totalUser = User::count();
+    $totalKategori = Kategori::count();
+    $totalAlat = Alat::count();
+    $totalPeminjaman = Peminjaman::count();
+    $totalPengembalian = Pengembalian::count();
 
-        return view('admin.dashboard', compact('logs'));
-    }
+    // Log aktivitas terbaru
+    $logs = LogAktivitas::with('user')
+        ->latest()
+        ->take(10)
+        ->get();
+
+    return view('admin.dashboard', compact(
+        'totalUser',
+        'totalKategori',
+        'totalAlat',
+        'totalPeminjaman',
+        'totalPengembalian',
+        'logs'
+    ));
+}
 
 
-    // =========================================================
-    // PROFIL ADMIN
-    // =========================================================
+    /*
+    |--------------------------------------------------------------------------
+    | PROFILE
+    |--------------------------------------------------------------------------
+    */
 
-    // Menampilkan profil admin yang sedang login
     public function profile()
     {
-        $user = auth()->user();
-
-        return view('admin.profile', compact('user'));
+        return view('admin.profile');
     }
 
-    // Memperbarui informasi profil admin (Nama, Email, No HP, Alamat, & Foto)
     public function updateProfile(Request $request)
     {
         $user = auth()->user();
 
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email,' . $user->id,
-            'no_hp' => 'nullable|string|max:20',
-            'alamat' => 'nullable|string',
-            'foto_profile' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        $validated = $request->validate([
+            'name'   => 'required|string|max:255',
+            'email'  => 'required|email|max:255|unique:users,email,' . $user->id,
+            'no_hp'  => 'nullable|string|max:20',
+            'alamat' => 'nullable|string|max:500',
         ]);
 
-        $user->name = $request->name;
-        $user->email = $request->email;
-        $user->no_hp = $request->no_hp;
-        $user->alamat = $request->alamat;
+        $user->update($validated);
 
-        // Upload foto profil baru jika ada
-        if ($request->hasFile('foto_profile')) {
-            // Hapus foto lama jika ada
-            if ($user->foto_profile && file_exists(public_path($user->foto_profile))) {
-                unlink(public_path($user->foto_profile));
-            }
+        LogAktivitas::create([
+            'user_id'   => auth()->id(),
+            'aktivitas' => 'Memperbarui profil',
+        ]);
 
-            $folder = public_path('storage/profil');
-            if (!file_exists($folder)) {
-                mkdir($folder, 0755, true);
-            }
-
-            $file = $request->file('foto_profile');
-            $filename = time() . '_' . $file->getClientOriginalName();
-            $file->move($folder, $filename);
-
-            $user->foto_profile = 'storage/profil/' . $filename;
-        }
-
-        $user->save();
-
-        return redirect()
-            ->route('admin.profile')
-            ->with('success', 'Profil berhasil diperbarui.');
+        return back()->with(
+            'success',
+            'Profil berhasil diperbarui.'
+        );
     }
 
-    // Mengupload foto profil admin secara terpisah (jika masih digunakan)
     public function updateFoto(Request $request)
     {
         $request->validate([
@@ -98,278 +93,91 @@ class AdminController extends Controller
 
         if ($request->hasFile('foto_profile')) {
 
-            // Hapus foto lama jika ada
-            if (
-                $user->foto_profile &&
-                file_exists(public_path($user->foto_profile))
-            ) {
-                unlink(public_path($user->foto_profile));
+            $folder = public_path('storage/profil');
+
+            if (!File::exists($folder)) {
+                File::makeDirectory(
+                    $folder,
+                    0755,
+                    true
+                );
             }
 
-            // Ambil file foto
+            // Hapus foto lama
+            if ($user->foto_profile) {
+
+                $fotoLama = public_path(
+                    $user->foto_profile
+                );
+
+                if (File::exists($fotoLama)) {
+                    File::delete($fotoLama);
+                }
+            }
+
             $file = $request->file('foto_profile');
 
-            // Buat nama file
-            $filename = time() . '_' . $file->getClientOriginalName();
+            $filename =
+                time() . '_' .
+                $file->getClientOriginalName();
 
-            // Simpan ke folder
             $file->move(
-                public_path('storage/profil'),
+                $folder,
                 $filename
             );
 
-            // Simpan lokasi foto ke database
-            $user->foto_profile = 'storage/profil/' . $filename;
-            $user->save();
+            $user->update([
+                'foto_profile' =>
+                    'storage/profil/' . $filename,
+            ]);
         }
 
-        return redirect()
-            ->route('admin.profile')
-            ->with('success', 'Foto profil berhasil diperbarui.');
-    }
-    
-    // =========================================================
-    // KELOLA LOG AKTIVITAS
-    // =========================================================
-
-    // Menampilkan daftar log aktivitas
-    public function indexLogAktivitas(Request $request)
-    {
-        $search = $request->input('search');
-
-        $logs = LogAktivitas::with('user')
-            ->when($search, function ($query, $search) {
-                return $query->where(function ($q) use ($search) {
-
-                    // Cari berdasarkan aktivitas
-                    $q->where(
-                        'aktivitas',
-                        'like',
-                        "%{$search}%"
-                    )
-
-                    // Cari berdasarkan nama pengguna
-                    ->orWhereHas('user', function ($user) use ($search) {
-                        $user->where(
-                            'name',
-                            'like',
-                            "%{$search}%"
-                        );
-                    });
-                });
-            })
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
-
-        return view(
-            'admin.logaktivitas.index',
-            compact('logs', 'search')
-        );
-    }
-
-
-    // =========================================================
-    // CRUD ALAT
-    // =========================================================
-
-    // 1. Menampilkan daftar alat
-    public function indexAlat(Request $request)
-    {
-        $search = $request->input('search');
-
-        $alats = Alat::with('kategori')
-            ->when($search, function ($query, $search) {
-                return $query
-                    ->where('nama_alat', 'like', "%{$search}%")
-                    ->orWhere('status_kondisi', 'like', "%{$search}%")
-                    ->orWhereHas('kategori', function ($q) use ($search) {
-                        $q->where(
-                            'nama_kategori',
-                            'like',
-                            "%{$search}%"
-                        );
-                    });
-            })
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
-
-        return view(
-            'admin.alat.index',
-            compact('alats', 'search')
-        );
-    }
-
-    // 2. Menampilkan form tambah alat
-    public function createAlat()
-    {
-        $kategoris = Kategori::all();
-
-        return view(
-            'admin.alat.create',
-            compact('kategoris')
-        );
-    }
-
-    // 3. Menyimpan alat baru
-    public function storeAlat(Request $request)
-    {
-        $request->validate([
-            'nama_alat' => 'required|string|max:255',
-            'kategori_id' => 'required|exists:kategori,id',
-            'stok' => 'required|integer|min:0',
-            'status_kondisi' => 'required|string|max:100',
-            'deskripsi' => 'nullable|string',
-            'gambar' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        ]);
-
-        $data = $request->all();
-
-        // Handle upload gambar jika ada
-        if ($request->hasFile('gambar')) {
-            $file = $request->file('gambar');
-
-            $filename = time() . '_' . $file->getClientOriginalName();
-
-            $file->move(
-                public_path('storage/alat'),
-                $filename
-            );
-
-            $data['gambar'] = 'storage/alat/' . $filename;
-        }
-
-        $alat = Alat::create($data);
-
-        // Catat log aktivitas
         LogAktivitas::create([
-            'user_id' => auth()->id(),
-            'aktivitas' => 'Menambahkan alat baru: ' . $alat->nama_alat,
+            'user_id'   => auth()->id(),
+            'aktivitas' => 'Memperbarui foto profil',
         ]);
 
-        return redirect()
-            ->route('admin.alat.index')
-            ->with(
-                'success',
-                'Data alat berhasil ditambahkan.'
-            );
-    }
-
-    // 4. Menampilkan form edit alat
-    public function editAlat($id)
-    {
-        $alat = Alat::findOrFail($id);
-        $kategoris = Kategori::all();
-
-        return view(
-            'admin.alat.edit',
-            compact('alat', 'kategoris')
+        return back()->with(
+            'success',
+            'Foto profil berhasil diperbarui.'
         );
     }
 
-    // 5. Memperbarui data alat
-    public function updateAlat(Request $request, $id)
-    {
-        $alat = Alat::findOrFail($id);
 
-        $request->validate([
-            'nama_alat' => 'required|string|max:255',
-            'kategori_id' => 'required|exists:kategori,id',
-            'stok' => 'required|integer|min:0',
-            'status_kondisi' => 'required|string|max:100',
-            'deskripsi' => 'nullable|string',
-            'gambar' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        ]);
+    /*
+    |--------------------------------------------------------------------------
+    | USER
+    |--------------------------------------------------------------------------
+    */
 
-        $data = $request->all();
-
-        // Handle update gambar jika ada file baru
-        if ($request->hasFile('gambar')) {
-
-            // Hapus gambar lama jika ada
-            if (
-                $alat->gambar &&
-                file_exists(public_path($alat->gambar))
-            ) {
-                unlink(public_path($alat->gambar));
-            }
-
-            $file = $request->file('gambar');
-
-            $filename = time() . '_' . $file->getClientOriginalName();
-
-            $file->move(
-                public_path('storage/alat'),
-                $filename
-            );
-
-            $data['gambar'] = 'storage/alat/' . $filename;
-        }
-
-        $alat->update($data);
-
-        // Catat log aktivitas
-        LogAktivitas::create([
-            'user_id' => auth()->id(),
-            'aktivitas' => 'Memperbarui alat: ' . $alat->nama_alat,
-        ]);
-
-        return redirect()
-            ->route('admin.alat.index')
-            ->with(
-                'success',
-                'Data alat berhasil diperbarui.'
-            );
-    }
-
-    // 6. Menghapus data alat
-    public function destroyAlat($id)
-    {
-        $alat = Alat::findOrFail($id);
-
-        $namaAlat = $alat->nama_alat;
-
-        // Hapus file gambar fisik jika ada
-        if (
-            $alat->gambar &&
-            file_exists(public_path($alat->gambar))
-        ) {
-            unlink(public_path($alat->gambar));
-        }
-
-        $alat->delete();
-
-        // Catat log aktivitas
-        LogAktivitas::create([
-            'user_id' => auth()->id(),
-            'aktivitas' => 'Menghapus alat: ' . $namaAlat,
-        ]);
-
-        return redirect()
-            ->route('admin.alat.index')
-            ->with(
-                'success',
-                'Data alat berhasil dihapus.'
-            );
-    }
-
-
-    // =========================================================
-    // CRUD USER
-    // =========================================================
-
-    // 1. Menampilkan daftar user
     public function indexUser(Request $request)
     {
         $search = $request->input('search');
 
-        $users = User::when($search, function ($query, $search) {
-            return $query
-                ->where('name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%")
-                ->orWhere('role', 'like', "%{$search}%");
-        })
+        $users = User::when(
+            $search,
+            function ($query, $search) {
+
+                $query->where(function ($q) use ($search) {
+
+                    $q->where(
+                        'name',
+                        'like',
+                        "%{$search}%"
+                    )
+                    ->orWhere(
+                        'email',
+                        'like',
+                        "%{$search}%"
+                    )
+                    ->orWhere(
+                        'role',
+                        'like',
+                        "%{$search}%"
+                    );
+                });
+            }
+        )
             ->latest()
             ->paginate(10)
             ->withQueryString();
@@ -380,65 +188,97 @@ class AdminController extends Controller
         );
     }
 
-    // 2. Menampilkan form tambah user
     public function createUser()
     {
         return view('admin.user.create');
     }
 
-
-    // 3. Menyimpan user baru ke database
     public function storeUser(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:6',
-            'role' => 'required|in:admin,petugas,peminjam',
-            'no_hp' => 'nullable|string|max:20',
-            'foto_profile' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        $validated = $request->validate([
+            'name' =>
+                'required|string|max:255',
+
+            'email' =>
+                'required|email|unique:users,email',
+
+            'password' =>
+                'required|string|min:6|confirmed',
+
+            'role' =>
+                'required|in:admin,petugas,peminjam',
+
+            'no_hp' =>
+                'nullable|string|max:20',
+
+            'alamat' =>
+                'nullable|string|max:500',
+
+            'foto_profile' =>
+                'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
-        // Data user
-        $data = [
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $request->role,
-            'no_hp' => $request->no_hp,
-        ];
+        $fotoProfile = null;
 
-        // Upload foto profil jika ada
         if ($request->hasFile('foto_profile')) {
 
-            // Folder penyimpanan
             $folder = public_path('storage/profil');
 
-            // Buat folder jika belum ada
-            if (!file_exists($folder)) {
-                mkdir($folder, 0755, true);
+            if (!File::exists($folder)) {
+                File::makeDirectory(
+                    $folder,
+                    0755,
+                    true
+                );
             }
 
-            // Ambil file
             $file = $request->file('foto_profile');
 
-            // Buat nama file unik
-            $filename = time() . '_' . $file->getClientOriginalName();
+            $filename =
+                time() . '_' .
+                $file->getClientOriginalName();
 
-            // Simpan file
-            $file->move($folder, $filename);
+            $file->move(
+                $folder,
+                $filename
+            );
 
-            // Simpan lokasi foto ke database
-            $data['foto_profile'] = 'storage/profil/' . $filename;
+            $fotoProfile =
+                'storage/profil/' . $filename;
         }
 
-        // Simpan user
-        $user = User::create($data);
+        User::create([
+            'name' =>
+                $validated['name'],
 
-        // Catat log aktivitas
+            'email' =>
+                $validated['email'],
+
+            'password' =>
+                Hash::make(
+                    $validated['password']
+                ),
+
+            'role' =>
+                $validated['role'],
+
+            'no_hp' =>
+                $validated['no_hp'] ?? null,
+
+            'alamat' =>
+                $validated['alamat'] ?? null,
+
+            'foto_profile' =>
+                $fotoProfile,
+        ]);
+
         LogAktivitas::create([
-            'user_id' => auth()->id(),
-            'aktivitas' => 'Menambahkan user baru: ' . $user->name,
+            'user_id' =>
+                auth()->id(),
+
+            'aktivitas' =>
+                'Menambahkan user: ' .
+                $validated['name'],
         ]);
 
         return redirect()
@@ -447,9 +287,8 @@ class AdminController extends Controller
                 'success',
                 'User berhasil ditambahkan.'
             );
-        }
+    }
 
-    // 4. Menampilkan form edit user
     public function editUser($id)
     {
         $user = User::findOrFail($id);
@@ -460,93 +299,171 @@ class AdminController extends Controller
         );
     }
 
-    // 5. Memperbarui data user
     public function updateUser(Request $request, $id)
     {
         $user = User::findOrFail($id);
 
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $id,
-            'password' => 'nullable|string|min:6',
-            'role' => 'required|in:admin,petugas,peminjam',
-            'no_hp' => 'nullable|string|max:20',
-            'foto_profile' => 'nullable|file|extensions:jpg,jpeg,png',
+        $validated = $request->validate([
+            'name' =>
+                'required|string|max:255',
+
+            'email' =>
+                'required|email|unique:users,email,' .
+                $user->id,
+
+            'role' =>
+                'required|in:admin,petugas,peminjam',
+
+            'no_hp' =>
+                'nullable|string|max:20',
+
+            'alamat' =>
+                'nullable|string|max:500',
+
+            'password' =>
+                'nullable|string|min:6',
+
+            'foto_profile' =>
+                'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
-        $data = [
-            'name' => $request->name,
-            'email' => $request->email,
-            'role' => $request->role,
-            'no_hp' => $request->no_hp,
-        ];
+        $user->update([
+            'name' =>
+                $validated['name'],
 
-        // Update password jika diisi
-        if ($request->filled('password')) {
-            $data['password'] = Hash::make($request->password);
+            'email' =>
+                $validated['email'],
+
+            'role' =>
+                $validated['role'],
+
+            'no_hp' =>
+                $validated['no_hp'] ?? null,
+
+            'alamat' =>
+                $validated['alamat'] ?? null,
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | PASSWORD BARU
+        |--------------------------------------------------------------------------
+        */
+
+        if (!empty($validated['password'])) {
+
+            $user->update([
+                'password' =>
+                    Hash::make(
+                        $validated['password']
+                    ),
+            ]);
         }
 
-        // Upload foto profil jika memilih foto baru
+        /*
+        |--------------------------------------------------------------------------
+        | FOTO PROFILE
+        |--------------------------------------------------------------------------
+        */
+
         if ($request->hasFile('foto_profile')) {
 
-            // Hapus foto lama jika ada
-            if (
-                $user->foto_profile &&
-                file_exists(public_path($user->foto_profile))
-            ) {
-               unlink(public_path($user->foto_profile));
-            }   
+            $folder =
+                public_path(
+                    'storage/profil'
+                );
 
-            // Pastikan folder tersedia
-            $folder = public_path('storage/profil');
+            if (!File::exists($folder)) {
 
-            if (!file_exists($folder)) {
-                mkdir($folder, 0755, true);
-            }   
+                File::makeDirectory(
+                    $folder,
+                    0755,
+                    true
+                );
+            }
 
-            // Ambil file foto baru
-            $file = $request->file('foto_profile');
+            // Hapus foto lama
+            if ($user->foto_profile) {
 
-            // Buat nama file unik
-            $filename = time() . '_' . $file->getClientOriginalName();
+                $fotoLama =
+                    public_path(
+                        $user->foto_profile
+                    );
 
-            // Simpan foto
-            $file->move($folder, $filename);
+                if (File::exists($fotoLama)) {
 
-            // Simpan lokasi foto ke database
-            $data['foto_profile'] = 'storage/profil/' . $filename;
+                    File::delete(
+                        $fotoLama
+                    );
+                }
+            }
+
+            $file =
+                $request->file(
+                    'foto_profile'
+                );
+
+            $filename =
+                time() . '_' .
+                $file->getClientOriginalName();
+
+            $file->move(
+                $folder,
+                $filename
+            );
+
+            $user->update([
+                'foto_profile' =>
+                    'storage/profil/' .
+                    $filename,
+            ]);
         }
 
-        // Update data user
-        $user->update($data);
-
-        // Catat log aktivitas
         LogAktivitas::create([
-            'user_id' => auth()->id(),
-            'aktivitas' => 'Memperbarui user: ' . $user->name,
+            'user_id' =>
+                auth()->id(),
+
+            'aktivitas' =>
+                'Memperbarui user: ' .
+                $user->name,
         ]);
 
         return redirect()
             ->route('admin.user.index')
             ->with(
                 'success',
-                'Data user berhasil diperbarui.'
+                'User berhasil diperbarui.'
             );
     }
 
-    // 6. Menghapus user
     public function destroyUser($id)
     {
         $user = User::findOrFail($id);
 
-        $namaUser = $user->name;
+        $nama = $user->name;
+
+        // Hapus foto profile
+        if ($user->foto_profile) {
+
+            $foto =
+                public_path(
+                    $user->foto_profile
+                );
+
+            if (File::exists($foto)) {
+                File::delete($foto);
+            }
+        }
 
         $user->delete();
 
-        // Catat log aktivitas
         LogAktivitas::create([
-            'user_id' => auth()->id(),
-            'aktivitas' => 'Menghapus user: ' . $namaUser,
+            'user_id' =>
+                auth()->id(),
+
+            'aktivitas' =>
+                'Menghapus user: ' .
+                $nama,
         ]);
 
         return redirect()
@@ -558,70 +475,83 @@ class AdminController extends Controller
     }
 
 
-    // =========================================================
-    // CRUD KATEGORI
-    // =========================================================
+    /*
+    |--------------------------------------------------------------------------
+    | KATEGORI
+    |--------------------------------------------------------------------------
+    */
 
-    // 1. Menampilkan daftar kategori
     public function indexKategori(Request $request)
     {
         $search = $request->input('search');
 
-        $kategoris = Kategori::when($search, function ($query, $search) {
-            return $query->where(
-                'nama_kategori',
-                'like',
-                "%{$search}%"
-            );
-        })
+        $kategoris = Kategori::when(
+            $search,
+            function ($query, $search) {
+
+                $query->where(
+                    'nama_kategori',
+                    'like',
+                    "%{$search}%"
+                );
+            }
+        )
             ->latest()
             ->paginate(5)
             ->withQueryString();
 
         return view(
             'admin.kategori.index',
-            compact('kategoris', 'search')
+            compact(
+                'kategoris',
+                'search'
+            )
         );
     }
 
-    // 2. Menampilkan form tambah kategori
     public function createKategori()
     {
-        return view('admin.kategori.create');
+        return view(
+            'admin.kategori.create'
+        );
     }
 
-    // 3. Menyimpan kategori baru
-    public function storeKategori(Request $request)
-    {
-        $request->validate([
-            'nama_kategori' =>
-                'required|string|max:255|unique:kategoris,nama_kategori',
-        ]);
+    public function storeKategori(
+        Request $request
+    ) {
+        $validated =
+            $request->validate([
+                'nama_kategori' =>
+                    'required|string|max:255|unique:kategori,nama_kategori',
+            ]);
 
-        $kategori = Kategori::create([
-            'nama_kategori' => $request->nama_kategori,
-        ]);
+        Kategori::create(
+            $validated
+        );
 
-        // Catat log aktivitas
         LogAktivitas::create([
-            'user_id' => auth()->id(),
+            'user_id' =>
+                auth()->id(),
+
             'aktivitas' =>
-                'Menambahkan kategori baru: ' .
-                $kategori->nama_kategori,
+                'Menambahkan kategori: ' .
+                $validated['nama_kategori'],
         ]);
 
         return redirect()
-            ->route('admin.kategori.index')
+            ->route(
+                'admin.kategori.index'
+            )
             ->with(
                 'success',
                 'Kategori berhasil ditambahkan.'
             );
     }
 
-    // 4. Menampilkan form edit kategori
     public function editKategori($id)
     {
-        $kategori = Kategori::findOrFail($id);
+        $kategori =
+            Kategori::findOrFail($id);
 
         return view(
             'admin.kategori.edit',
@@ -629,65 +559,81 @@ class AdminController extends Controller
         );
     }
 
-    // 5. Memperbarui kategori
-    public function updateKategori(Request $request, $id)
-    {
-        $kategori = Kategori::findOrFail($id);
+    public function updateKategori(
+        Request $request,
+        $id
+    ) {
+        $kategori =
+            Kategori::findOrFail($id);
 
-        $request->validate([
-            'nama_kategori' =>
-                'required|string|max:255|unique:kategoris,nama_kategori,' . $id,
-        ]);
+        $validated =
+            $request->validate([
+                'nama_kategori' =>
+                    'required|string|max:255|unique:kategori,nama_kategori,' .
+                    $id,
+            ]);
 
-        $kategori->update([
-            'nama_kategori' => $request->nama_kategori,
-        ]);
+        $kategori->update(
+            $validated
+        );
 
-        // Catat log aktivitas
         LogAktivitas::create([
-            'user_id' => auth()->id(),
+            'user_id' =>
+                auth()->id(),
+
             'aktivitas' =>
                 'Memperbarui kategori: ' .
-                $kategori->nama_kategori,
+                $validated['nama_kategori'],
         ]);
 
         return redirect()
-            ->route('admin.kategori.index')
+            ->route(
+                'admin.kategori.index'
+            )
             ->with(
                 'success',
                 'Kategori berhasil diperbarui.'
             );
     }
 
-    // 6. Menghapus kategori
     public function destroyKategori($id)
     {
-        $kategori = Kategori::findOrFail($id);
+        $kategori =
+            Kategori::findOrFail($id);
 
-        // Cek apakah kategori masih digunakan oleh alat
-        if ($kategori->alats()->count() > 0) {
-            return redirect()
-                ->route('admin.kategori.index')
-                ->with(
-                    'error',
-                    'Kategori tidak dapat dihapus karena masih digunakan oleh data alat.'
-                );
+        // Cek apakah kategori masih digunakan alat
+        $jumlahAlat =
+            Alat::where(
+                'kategori_id',
+                $id
+            )->count();
+
+        if ($jumlahAlat > 0) {
+
+            return back()->with(
+                'error',
+                'Kategori tidak dapat dihapus karena masih digunakan oleh alat.'
+            );
         }
 
-        $namaKategori = $kategori->nama_kategori;
+        $namaKategori =
+            $kategori->nama_kategori;
 
         $kategori->delete();
 
-        // Catat log aktivitas
         LogAktivitas::create([
-            'user_id' => auth()->id(),
+            'user_id' =>
+                auth()->id(),
+
             'aktivitas' =>
                 'Menghapus kategori: ' .
                 $namaKategori,
         ]);
 
         return redirect()
-            ->route('admin.kategori.index')
+            ->route(
+                'admin.kategori.index'
+            )
             ->with(
                 'success',
                 'Kategori berhasil dihapus.'
@@ -695,145 +641,493 @@ class AdminController extends Controller
     }
 
 
-    // =========================================================
-    // CRUD PEMINJAMAN
-    // =========================================================
+    /*
+    |--------------------------------------------------------------------------
+    | ALAT
+    |--------------------------------------------------------------------------
+    */
 
-    // 1. Menampilkan daftar peminjaman + SEARCH
-    public function indexPeminjaman(Request $request)
+    public function indexAlat(Request $request)
     {
-        $search = $request->input('search');
+        $search =
+            $request->input('search');
 
-        $peminjamans = Peminjaman::with([
-            'user',
-            'detailPinjams.alat'
-        ])
-            ->when($search, function ($query, $search) {
-                return $query->where(function ($q) use ($search) {
+        $alats = Alat::with('kategori')
+            ->when(
+                $search,
+                function ($query, $search) {
 
-                    // Cari berdasarkan status peminjaman
-                    $q->where(
-                        'status',
-                        'like',
-                        "%{$search}%"
-                    )
+                    $query->where(
+                        function ($q) use ($search) {
 
-                    // Cari berdasarkan nama peminjam
-                    ->orWhereHas('user', function ($user) use ($search) {
-                        $user->where(
-                            'name',
-                            'like',
-                            "%{$search}%"
-                        );
-                    })
-
-                    // Cari berdasarkan nama alat
-                    ->orWhereHas(
-                        'detailPinjams.alat',
-                        function ($alat) use ($search) {
-                            $alat->where(
+                            $q->where(
                                 'nama_alat',
+                                'like',
+                                "%{$search}%"
+                            )
+                            ->orWhere(
+                                'status_kondisi',
+                                'like',
+                                "%{$search}%"
+                            )
+                            ->orWhereHas(
+                                'kategori',
+                                function ($kategori) use ($search) {
+
+                                    $kategori->where(
+                                        'nama_kategori',
+                                        'like',
+                                        "%{$search}%"
+                                    );
+                                }
+                            );
+                        }
+                    );
+                }
+            )
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        return view(
+            'admin.alat.index',
+            compact(
+                'alats',
+                'search'
+            )
+        );
+    }
+
+    public function createAlat()
+    {
+        $kategoris =
+            Kategori::all();
+
+        return view(
+            'admin.alat.create',
+            compact('kategoris')
+        );
+    }
+
+    public function storeAlat(
+        Request $request
+    ) {
+        $validated =
+            $request->validate([
+                'nama_alat' =>
+                    'required|string|max:255',
+
+                'kategori_id' =>
+                    'required|exists:kategori,id',
+
+                'stok' =>
+                    'required|integer|min:0',
+
+                'status_kondisi' =>
+                    'required|string|max:255',
+
+                'deskripsi' =>
+                    'nullable|string',
+
+                'gambar' =>
+                    'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            ]);
+
+        $gambar = null;
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPLOAD GAMBAR ALAT
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->hasFile('gambar')) {
+
+            $folder =
+                public_path(
+                    'storage/alat'
+                );
+
+            if (!File::exists($folder)) {
+
+                File::makeDirectory(
+                    $folder,
+                    0755,
+                    true
+                );
+            }
+
+            $file =
+                $request->file('gambar');
+
+            $filename =
+                time() . '_' .
+                $file->getClientOriginalName();
+
+            $file->move(
+                $folder,
+                $filename
+            );
+
+            // Simpan path relatif di database
+            $gambar =
+                'alat/' . $filename;
+        }
+
+        Alat::create([
+            'nama_alat' =>
+                $validated['nama_alat'],
+
+            'kategori_id' =>
+                $validated['kategori_id'],
+
+            'stok' =>
+                $validated['stok'],
+
+            'status_kondisi' =>
+                $validated['status_kondisi'],
+
+            'deskripsi' =>
+                $validated['deskripsi'] ?? null,
+
+            'gambar' =>
+                $gambar,
+        ]);
+
+        LogAktivitas::create([
+            'user_id' =>
+                auth()->id(),
+
+            'aktivitas' =>
+                'Menambahkan alat: ' .
+                $validated['nama_alat'],
+        ]);
+
+        return redirect()
+            ->route(
+                'admin.alat.index'
+            )
+            ->with(
+                'success',
+                'Alat berhasil ditambahkan.'
+            );
+    }
+
+    public function editAlat($id)
+    {
+        $alat =
+            Alat::findOrFail($id);
+
+        $kategoris =
+            Kategori::all();
+
+        return view(
+            'admin.alat.edit',
+            compact(
+                'alat',
+                'kategoris'
+            )
+        );
+    }
+
+    public function updateAlat(
+        Request $request,
+        $id
+    ) {
+        $alat =
+            Alat::findOrFail($id);
+
+        $validated =
+            $request->validate([
+                'nama_alat' =>
+                    'required|string|max:255',
+
+                'kategori_id' =>
+                    'required|exists:kategori,id',
+
+                'stok' =>
+                    'required|integer|min:0',
+
+                'status_kondisi' =>
+                    'required|string|max:255',
+
+                'deskripsi' =>
+                    'nullable|string',
+
+                'gambar' =>
+                    'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            ]);
+
+        $data = [
+            'nama_alat' =>
+                $validated['nama_alat'],
+
+            'kategori_id' =>
+                $validated['kategori_id'],
+
+            'stok' =>
+                $validated['stok'],
+
+            'status_kondisi' =>
+                $validated['status_kondisi'],
+
+            'deskripsi' =>
+                $validated['deskripsi'] ?? null,
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | GAMBAR BARU
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->hasFile('gambar')) {
+
+            // Hapus gambar lama
+            if ($alat->gambar) {
+
+                $gambarLama =
+                    public_path(
+                        'storage/' .
+                        $alat->gambar
+                    );
+
+                if (File::exists($gambarLama)) {
+
+                    File::delete(
+                        $gambarLama
+                    );
+                }
+            }
+
+            $folder =
+                public_path(
+                    'storage/alat'
+                );
+
+            if (!File::exists($folder)) {
+
+                File::makeDirectory(
+                    $folder,
+                    0755,
+                    true
+                );
+            }
+
+            $file =
+                $request->file('gambar');
+
+            $filename =
+                time() . '_' .
+                $file->getClientOriginalName();
+
+            $file->move(
+                $folder,
+                $filename
+            );
+
+            $data['gambar'] =
+                'alat/' . $filename;
+        }
+
+        $alat->update($data);
+
+        LogAktivitas::create([
+            'user_id' =>
+                auth()->id(),
+
+            'aktivitas' =>
+                'Memperbarui alat: ' .
+                $alat->nama_alat,
+        ]);
+
+        return redirect()
+            ->route(
+                'admin.alat.index'
+            )
+            ->with(
+                'success',
+                'Alat berhasil diperbarui.'
+            );
+    }
+
+    public function destroyAlat($id)
+    {
+        $alat =
+            Alat::findOrFail($id);
+
+        $namaAlat =
+            $alat->nama_alat;
+
+        // Hapus file gambar
+        if ($alat->gambar) {
+
+            $gambar =
+                public_path(
+                    'storage/' .
+                    $alat->gambar
+                );
+
+            if (File::exists($gambar)) {
+                File::delete($gambar);
+            }
+        }
+
+        $alat->delete();
+
+        LogAktivitas::create([
+            'user_id' =>
+                auth()->id(),
+
+            'aktivitas' =>
+                'Menghapus alat: ' .
+                $namaAlat,
+        ]);
+
+        return redirect()
+            ->route(
+                'admin.alat.index'
+            )
+            ->with(
+                'success',
+                'Alat berhasil dihapus.'
+            );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PEMINJAMAN
+    |--------------------------------------------------------------------------
+    */
+
+    public function indexPeminjaman(
+        Request $request
+    ) {
+        $search =
+            $request->input('search');
+
+        $peminjamans =
+            Peminjaman::with([
+                'user',
+                'detailpinjam.alat'
+            ])
+            ->when(
+                $search,
+                function ($query, $search) {
+
+                    $query->whereHas(
+                        'user',
+                        function ($user) use ($search) {
+
+                            $user->where(
+                                'name',
                                 'like',
                                 "%{$search}%"
                             );
                         }
                     );
-                });
-            })
+                }
+            )
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
         return view(
             'admin.peminjaman.index',
-            compact('peminjamans', 'search')
+            compact(
+                'peminjamans',
+                'search'
+            )
         );
     }
 
-    // 2. Menampilkan form tambah peminjaman
     public function createPeminjaman()
     {
-        $users = User::where(
-            'role',
-            'peminjam'
-        )->get();
+        $users =
+            User::where(
+                'role',
+                'peminjam'
+            )->get();
 
-        $alats = Alat::where(
-            'stok',
-            '>',
-            0
-        )->get();
+        $alats =
+            Alat::all();
 
         return view(
             'admin.peminjaman.create',
-            compact('users', 'alats')
+            compact(
+                'users',
+                'alats'
+            )
         );
     }
 
-    // 3. Menyimpan data peminjaman baru
-    public function storePeminjaman(Request $request)
-    {
-        $request->validate([
-            'user_id' =>
-                'required|exists:users,id',
+    public function storePeminjaman(
+        Request $request
+    ) {
+        $validated =
+            $request->validate([
+                'user_id' =>
+                    'required|exists:users,id',
 
-            'tgl_pinjam' =>
-                'required|date',
+                'tgl_pinjam' =>
+                    'required|date',
 
-            'tgl_kembali_plan' =>
-                'required|date|after_or_equal:tgl_pinjam',
+                'tgl_kembali_plan' =>
+                    'required|date|after_or_equal:tgl_pinjam',
 
-            'alat_id' =>
-                'required|array',
+                'alat_id' =>
+                    'required|array',
 
-            'alat_id.*' =>
-                'exists:alats,id',
+                'alat_id.*' =>
+                    'required|exists:alat,id',
 
-            'jumlah' =>
-                'required|array',
+                'jumlah' =>
+                    'required|array',
 
-            'jumlah.*' =>
-                'integer|min:1',
-        ]);
+                'jumlah.*' =>
+                    'required|integer|min:1',
+            ]);
 
         DB::beginTransaction();
 
         try {
 
-            // Buat transaksi utama peminjaman
-            $peminjaman = Peminjaman::create([
-                'user_id' =>
-                    $request->user_id,
+            $peminjaman =
+                Peminjaman::create([
+                    'user_id' =>
+                        $validated['user_id'],
 
-                'tgl_pinjam' =>
-                    $request->tgl_pinjam,
+                    'tgl_pinjam' =>
+                        $validated['tgl_pinjam'],
 
-                'tgl_kembali_plan' =>
-                    $request->tgl_kembali_plan,
+                    'tgl_kembali_plan' =>
+                        $validated['tgl_kembali_plan'],
 
-                'status' =>
-                    'diajukan',
-            ]);
+                    'status' =>
+                        'diajukan',
+                ]);
 
-            // Simpan detail alat yang dipinjam
             foreach (
-                $request->alat_id
+                $validated['alat_id']
                 as $index => $alatId
             ) {
 
-                $jumlahPinjam =
-                    $request->jumlah[$index];
+                $jumlah =
+                    $validated['jumlah'][$index];
 
                 $alat =
-                    Alat::findOrFail($alatId);
+                    Alat::findOrFail(
+                        $alatId
+                    );
 
-                // Validasi stok
-                if (
-                    $alat->stok <
-                    $jumlahPinjam
-                ) {
+                // Cek stok
+                if ($alat->stok < $jumlah) {
+
                     throw new \Exception(
-                        "Stok alat '{$alat->nama_alat}' tidak mencukupi."
+                        'Jumlah alat ' .
+                        $alat->nama_alat .
+                        ' tidak mencukupi.'
                     );
                 }
 
@@ -845,9 +1139,17 @@ class AdminController extends Controller
                         $alatId,
 
                     'jumlah' =>
-                        $jumlahPinjam,
+                        $jumlah,
                 ]);
             }
+
+            LogAktivitas::create([
+                'user_id' =>
+                    auth()->id(),
+
+                'aktivitas' =>
+                    'Menambahkan peminjaman',
+            ]);
 
             DB::commit();
 
@@ -857,69 +1159,325 @@ class AdminController extends Controller
                 )
                 ->with(
                     'success',
-                    'Data peminjaman berhasil diajukan.'
+                    'Peminjaman berhasil dibuat.'
                 );
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
 
             DB::rollBack();
+
+            report($e);
 
             return back()
                 ->withInput()
                 ->with(
                     'error',
-                    $e->getMessage()
+                    'Peminjaman gagal dibuat.'
                 );
         }
     }
 
-    // 4. Mengubah status peminjaman
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE STATUS PEMINJAMAN
+    |--------------------------------------------------------------------------
+    */
+
     public function updateStatusPeminjaman(
         Request $request,
         $id
     ) {
-        $request->validate([
-            'status' =>
-                'required|in:diajukan,dipinjam,selesai,telat',
-        ]);
+        DB::beginTransaction();
 
-        $peminjaman =
-            Peminjaman::findOrFail($id);
+        try {
 
-        $peminjaman->update([
-            'status' =>
-                $request->status,
-        ]);
+            $peminjaman = Peminjaman::with([
+                'detailPinjams.alat',
+                'pengembalian'
+            ])->findOrFail($id);
 
-        return redirect()
-            ->route(
-                'admin.peminjaman.index'
-            )
-            ->with(
+            $validated = $request->validate([
+                'status' =>
+                    'required|in:diajukan,dipinjam,ditolak,telat,selesai,dikembalikan',
+            ]);
+
+            $statusBaru =
+                $validated['status'];
+
+            $statusLama =
+                strtolower(
+                    $peminjaman->status
+                );
+
+            /*
+            |--------------------------------------------------------------------------
+            | JIKA STATUS MENJADI SELESAI
+            |--------------------------------------------------------------------------
+            */
+
+            if ($statusBaru === 'selesai') {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Cek apakah pengembalian sudah ada
+                |--------------------------------------------------------------------------
+                */
+
+                $pengembalianSudahAda =
+                    Pengembalian::where(
+                        'peminjaman_id',
+                        $peminjaman->id
+                    )->exists();
+
+                /*
+                |--------------------------------------------------------------------------
+                | Kembalikan stok hanya jika sebelumnya
+                | status dipinjam atau telat.
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    !$pengembalianSudahAda &&
+                    in_array(
+                        $statusLama,
+                        [
+                            'dipinjam',
+                            'telat'
+                        ],
+                        true
+                    )
+                ) {
+
+                    foreach (
+                        $peminjaman->detailPinjams
+                        as $detail
+                    ) {
+
+                        $alat =
+                            Alat::findOrFail(
+                                $detail->alat_id
+                            );
+
+                        $alat->stok +=
+                            $detail->jumlah;
+
+                        $alat->save();
+                    }
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Buat data pengembalian
+                |--------------------------------------------------------------------------
+                */
+
+                if (!$pengembalianSudahAda) {
+
+                    Pengembalian::create([
+                        'peminjaman_id' =>
+                            $peminjaman->id,
+
+                        'tgl_kembali' =>
+                            now()->toDateString(),
+
+                        'kondisi_kembali' =>
+                            'Baik',
+
+                        'denda' =>
+                            0,
+
+                        'petugas_id' =>
+                            auth()->id(),
+                    ]);
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update status peminjaman
+            |--------------------------------------------------------------------------
+            */
+
+            $peminjaman->update([
+                'status' =>
+                    $statusBaru,
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | LOG AKTIVITAS
+            |--------------------------------------------------------------------------
+            */
+
+            LogAktivitas::create([
+                'user_id' =>
+                    auth()->id(),
+
+                'aktivitas' =>
+                    'Memperbarui status peminjaman menjadi: ' .
+                    $statusBaru,
+            ]);
+
+            DB::commit();
+
+            return back()->with(
                 'success',
                 'Status peminjaman berhasil diperbarui.'
             );
+
+        } catch (\Throwable $e) {
+
+            DB::rollBack();
+
+            report($e);
+
+            return back()->with(
+                'error',
+                'Status peminjaman gagal diperbarui.'
+            );
+        }
     }
 
-    // 5. Menghapus data peminjaman
+
+    /*
+    |--------------------------------------------------------------------------
+    | HAPUS PEMINJAMAN
+    |--------------------------------------------------------------------------
+    */
+
     public function destroyPeminjaman($id)
     {
-        $peminjaman =
-            Peminjaman::findOrFail($id);
+        DB::beginTransaction();
 
-        $peminjaman
-            ->detailPinjams()
-            ->delete();
+        try {
 
-        $peminjaman->delete();
+            $peminjaman =
+                Peminjaman::with('user')
+                ->findOrFail($id);
 
-        return redirect()
-            ->route(
-                'admin.peminjaman.index'
+            /*
+            |--------------------------------------------------------------------------
+            | PEMINJAMAN HANYA BOLEH DIHAPUS JIKA SUDAH SELESAI
+            |--------------------------------------------------------------------------
+            */
+
+            if ($peminjaman->status !== 'selesai') {
+
+                DB::rollBack();
+
+                return back()->with(
+                    'error',
+                    'Peminjaman belum selesai dan belum dapat dihapus.'
+                );
+            }
+
+            $namaPeminjam =
+                $peminjaman->user->name ??
+                'Tidak diketahui';
+
+            // Hapus detail peminjaman terlebih dahulu
+            DetailPinjam::where(
+                'peminjaman_id',
+                $peminjaman->id
+            )->delete();
+
+            // Hapus data peminjaman
+            $peminjaman->delete();
+
+            LogAktivitas::create([
+                'user_id' =>
+                    auth()->id(),
+
+                'aktivitas' =>
+                    'Menghapus peminjaman dari: ' .
+                    $namaPeminjam,
+            ]);
+
+            DB::commit();
+
+            return redirect()
+                ->route(
+                    'admin.peminjaman.index'
+                )
+                ->with(
+                    'success',
+                    'Peminjaman berhasil dihapus.'
+                );
+
+        } catch (\Throwable $e) {
+
+            DB::rollBack();
+
+            report($e);
+
+            return redirect()
+                ->route(
+                    'admin.peminjaman.index'
+                )
+                ->with(
+                    'error',
+                    'Peminjaman gagal dihapus.'
+                );
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOG AKTIVITAS
+    |--------------------------------------------------------------------------
+    */
+
+    public function indexLogAktivitas(
+        Request $request
+    ) {
+        $search =
+            $request->input('search');
+
+        $logs =
+            LogAktivitas::with('user')
+            ->whereDate(
+                'created_at',
+                today()
             )
-            ->with(
-                'success',
-                'Data peminjaman berhasil dihapus.'
-            );
+            ->when(
+                $search,
+                function ($query, $search) {
+
+                    $query->where(
+                        function ($q) use ($search) {
+
+                            $q->where(
+                                'aktivitas',
+                                'like',
+                                "%{$search}%"
+                            )
+                            ->orWhereHas(
+                                'user',
+                                function ($user) use ($search) {
+
+                                    $user->where(
+                                        'name',
+                                        'like',
+                                        "%{$search}%"
+                                    );
+                                }
+                            );
+                        }
+                    );
+                }
+            )
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        return view(
+            'admin.logaktivitas.index',
+            compact(
+                'logs',
+                'search'
+            )
+        );
     }
 }

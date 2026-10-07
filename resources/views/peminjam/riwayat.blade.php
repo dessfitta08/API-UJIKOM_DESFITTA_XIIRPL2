@@ -15,15 +15,31 @@
 
     <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
-            <thead>
-                <tr class="border-b bg-gray-50 text-gray-600 text-xs uppercase">
-                    <th class="p-3">No</th>
-                    <th class="p-3">Tgl Pinjam</th>
-                    <th class="p-3">Rencana Kembali</th>
-                    <th class="p-3">Daftar Alat</th>
-                    <th class="p-3">Status</th>
-                </tr>
-            </thead>
+        <thead>
+    <tr class="bg-slate-800 text-white">
+
+        <th class="py-3 px-4 text-center font-semibold whitespace-nowrap">
+            No
+        </th>
+
+        <th class="py-3 px-4 text-center font-semibold whitespace-nowrap">
+            Tgl Pinjam
+        </th>
+
+        <th class="py-3 px-4 text-center font-semibold whitespace-nowrap">
+            Rencana Kembali
+        </th>
+
+        <th class="py-3 px-4 text-center font-semibold whitespace-nowrap">
+            Daftar Alat
+        </th>
+
+        <th class="py-3 px-4 text-center font-semibold whitespace-nowrap">
+            Status
+        </th>
+
+    </tr>
+</thead>
             <tbody class="text-sm divide-y divide-gray-100">
                 @forelse($peminjamans as $index => $item)
                     <tr>

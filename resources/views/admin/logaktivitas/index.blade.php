@@ -7,7 +7,7 @@
 
 <div class="bg-white rounded-xl shadow-sm p-6">
 
-    <!-- HEADER -->
+    {{-- HEADER --}}
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
 
         <div>
@@ -20,7 +20,7 @@
             </p>
         </div>
 
-        <!-- SEARCH -->
+        {{-- SEARCH --}}
         <form
             action="{{ route('admin.logaktivitas.index') }}"
             method="GET"
@@ -56,53 +56,69 @@
     </div>
 
 
-    <!-- TABEL LOG AKTIVITAS -->
+    {{-- TABEL LOG AKTIVITAS --}}
     <div class="overflow-x-auto">
 
-        <table class="w-full text-sm text-left">
+        <table class="w-full text-sm border-collapse">
 
-            <thead class="bg-gray-800 text-white">
+            {{-- HEADER TABEL --}}
+            <thead>
 
-                <tr>
-                    <th class="px-4 py-3">
+                <tr class="bg-slate-800 text-white">
+
+                    {{-- NO --}}
+                    <th class="px-4 py-3 text-center font-semibold">
                         No
                     </th>
 
-                    <th class="px-4 py-3">
+                    {{-- PENGGUNA --}}
+                    <th class="px-4 py-3 text-left font-semibold">
                         Pengguna
                     </th>
 
-                    <th class="px-4 py-3">
+                    {{-- AKTIVITAS --}}
+                    <th class="px-4 py-3 text-left font-semibold">
                         Aktivitas
                     </th>
 
-                    <th class="px-4 py-3">
+                    {{-- WAKTU --}}
+                    <th class="px-4 py-3 text-center font-semibold">
                         Waktu
                     </th>
+
                 </tr>
 
             </thead>
 
-            <tbody class="divide-y divide-gray-200">
+
+            {{-- ISI TABEL --}}
+            <tbody class="text-gray-700">
 
                 @forelse($logs as $log)
 
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-gray-50 transition">
 
-                        <td class="px-4 py-3 text-gray-700">
+                        {{-- NO --}}
+                        <td class="px-4 py-3 border-b text-center">
                             {{ $logs->firstItem() + $loop->index }}
                         </td>
 
-                        <td class="px-4 py-3 font-medium text-gray-800">
+
+                        {{-- PENGGUNA --}}
+                        <td class="px-4 py-3 border-b text-left font-medium text-gray-800">
                             {{ $log->user->name ?? 'User tidak ditemukan' }}
                         </td>
 
-                        <td class="px-4 py-3 text-gray-700">
+
+                        {{-- AKTIVITAS --}}
+                        <td class="px-4 py-3 border-b text-left">
                             {{ $log->aktivitas }}
                         </td>
 
-                        <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
-                            {{ $log->created_at->format('d-m-Y H:i') }}
+
+                        {{-- WAKTU --}}
+                        <td class="px-4 py-3 border-b text-center whitespace-nowrap">
+                            {{ $log->created_at ? $log->created_at->format('d-m-Y H:i') : '-' }}
                         </td>
 
                     </tr>
@@ -110,12 +126,14 @@
                 @empty
 
                     <tr>
+
                         <td
                             colspan="4"
-                            class="px-4 py-8 text-center text-gray-500"
+                            class="px-4 py-8 border-b text-center text-gray-500"
                         >
                             Tidak ada data log aktivitas.
                         </td>
+
                     </tr>
 
                 @endforelse
@@ -127,7 +145,7 @@
     </div>
 
 
-    <!-- PAGINATION -->
+    {{-- PAGINATION --}}
     @if($logs->hasPages())
 
         <div class="mt-6">

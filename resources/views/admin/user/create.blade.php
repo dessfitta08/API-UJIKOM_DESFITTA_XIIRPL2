@@ -69,6 +69,24 @@
     </div>
 
 
+    <!-- Konfirmasi Password -->
+    <div class="mb-4">
+        <label class="block text-gray-700 text-sm font-semibold mb-2">
+            Konfirmasi Password
+        </label>
+
+        <input
+            type="password"
+            name="password_confirmation"
+            required
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+        @error('password_confirmation')
+            <span class="text-red-500 text-xs">{{ $message }}</span>
+        @enderror
+    </div>
+
+
     <!-- Foto Profil -->
     <div class="mb-4">
         <label class="block text-gray-700 text-sm font-semibold mb-2">
